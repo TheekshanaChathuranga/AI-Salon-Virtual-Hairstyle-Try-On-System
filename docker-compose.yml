@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://salon_admin:salon_secret_pass@postgres:5432/salon_tryon_db
+      - ML_SERVICE_URL=http://ml-service:8001
+      - IMAGE_RETENTION_HOURS=24
+      - MAX_IMAGE_SIZE_MB=10
+      - PORT=8000
+    depends_on:
+      - postgres
+      - ml-service
+    volumes:
+      - backend_uploads:/app/uploads
+    restart: unless-stopped
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - MODEL_ADAPTER=localvision # Switch to 'hairfastgan' or 'stablehair' when GPU weights mounted
+      - DEVICE=cpu # Or 'cuda' with nvidia-container-toolkit
+      - PORT=8001
+      - LOG_LEVEL=INFO
+    volumes:
+      - ml_models:/app/pretrained_models
+    restart: unless-stopped
+    # Uncomment when NVIDIA GPU container runtime is enabled:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=salon_admin
+      - POSTGRES_PASSWORD=salon_secret_pass
+      - POSTGRES_DB=salon_tryon_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  backend_uploads:
+  ml_models:
