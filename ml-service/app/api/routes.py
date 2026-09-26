@@ -5,7 +5,14 @@ API Route Handlers for the ML Inference Microservice.
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, status
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
-import torch
+try:
+    import torch
+    cuda_available = torch.cuda.is_available()
+    gpu_name = torch.cuda.get_device_name(0) if cuda_available else None
+except ImportError:
+    torch = None
+    cuda_available = False
+    gpu_name = None
 
 from app.config import settings
 from app.services.inference import inference_service
@@ -22,13 +29,12 @@ class FaceValidationRequestJSON(BaseModel):
 
 @router.get("/health", status_code=status.HTTP_200_OK)
 async def health_check():
-    cuda_available = torch.cuda.is_available()
     return {
         "status": "healthy",
         "service": "salon-ml-inference",
         "device": "cuda" if cuda_available else "cpu",
         "cuda_available": cuda_available,
-        "gpu_name": torch.cuda.get_device_name(0) if cuda_available else None,
+        "gpu_name": gpu_name,
         "active_adapter": settings.MODEL_ADAPTER
     }
 
